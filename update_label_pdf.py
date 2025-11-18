@@ -157,7 +157,7 @@ def try_register_font(font_path=None, font_bold_path=None):
                 pass
     return reg_name, bold_name
 
-def build_overlay(label_pdf_path, width, height, source_pdf_path, batch_text, img_max_ratio=0.40, img_lr_margin=6, img_bottom_margin=0, font_path=None, font_bold_path=None, batch_align="right", batch_offset_x=0, batch_offset_y=0, batch_font_size=12, batch_font_weight="regular", img_height_pt=0, img_scale=1.0, place="barcode", abs_x=0, abs_y=0, render_dpi=200):
+def build_overlay(label_pdf_path, width, height, source_pdf_path, batch_text, img_max_ratio=0.40, img_lr_margin=6, img_bottom_margin=0, font_path=None, font_bold_path=None, batch_align="right", batch_offset_x=0, batch_offset_y=0, batch_font_size=12, batch_font_weight="regular", batch_length_align="none", img_height_pt=0, img_scale=1.0, place="barcode", abs_x=0, abs_y=0, render_dpi=200):
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=(width, height))
     img = render_source_pdf_to_image(source_pdf_path, dpi=render_dpi)
@@ -207,8 +207,15 @@ def build_overlay(label_pdf_path, width, height, source_pdf_path, batch_text, im
         y = height - (top + h)
         c.setFont(font_name, batch_font_size)
         tw = pdfmetrics.stringWidth(batch_text, font_name, batch_font_size)
+        tw_base = pdfmetrics.stringWidth("93244706336", font_name, batch_font_size)
+        if batch_length_align == "left":
+            length_adjust = (tw - tw_base)
+        elif batch_length_align == "center":
+            length_adjust = (tw - tw_base) / 2.0
+        else:
+            length_adjust = 0.0
         if batch_align == "right":
-            x_draw = x + w - tw - 1 + batch_offset_x
+            x_draw = x + w - tw - 1 + batch_offset_x + length_adjust
         else:
             x_draw = x + 1 + batch_offset_x
         y_draw = y + 2 + batch_offset_y
@@ -254,6 +261,7 @@ def main():
     parser.add_argument("--batch_offset_y", type=float, default=0)
     parser.add_argument("--batch_font_size", type=int, default=12)
     parser.add_argument("--batch_font_weight", choices=["regular","bold"], default="regular")
+    parser.add_argument("--batch_length_align", choices=["none","left","center"], default="none")
     parser.add_argument("--img_height_pt", type=float, default=0)
     parser.add_argument("--img_scale", type=float, default=1.0)
     parser.add_argument("--place", choices=["bottom","barcode","absolute"], default="barcode")
@@ -275,6 +283,7 @@ def main():
         batch_offset_y=args.batch_offset_y,
         batch_font_size=args.batch_font_size,
         batch_font_weight=args.batch_font_weight,
+        batch_length_align=args.batch_length_align,
         img_height_pt=args.img_height_pt,
         img_scale=args.img_scale,
         place=args.place,

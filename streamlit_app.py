@@ -59,6 +59,7 @@ if uploaded is not None:
                 batch_offset_y=-5,
                 batch_font_size=8,
                 batch_font_weight='bold',
+                batch_length_align='left',
                 img_height_pt=0,
                 img_scale=1.0,
                 place='absolute',
