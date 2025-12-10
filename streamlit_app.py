@@ -2,6 +2,7 @@ import os
 import re
 import uuid
 from glob import glob
+from datetime import datetime
 import streamlit as st
 from update_label_pdf import get_page_size, build_overlay, merge_and_write, read_n_text
 
@@ -10,15 +11,35 @@ os.makedirs('outputs', exist_ok=True)
 os.makedirs('tmp', exist_ok=True)
 os.environ['TMPDIR'] = os.path.abspath('tmp')
 
+BATCH_OFFSET_X = -48.0
+BATCH_OFFSET_Y = -5.0
+BATCH_FONT_SIZE = 6
+
 def infer_label_path(base_dir):
     env = os.environ.get('LABEL_PDF_PATH')
     if env and os.path.exists(env):
         return env
+    fixed = os.path.join(base_dir, 'BQ20251210125617009000UY6.pdf')
+    if os.path.exists(fixed):
+        return fixed
     files = [p for p in glob(os.path.join(base_dir, 'BQ*.pdf')) if 'updated' not in os.path.basename(p).lower()]
     if not files:
         return None
     files.sort(key=lambda p: os.path.getmtime(p), reverse=True)
     return files[0]
+
+def cleanup_dir(d, limit=10):
+    try:
+        files = [os.path.join(d, f) for f in os.listdir(d)]
+        files = [p for p in files if os.path.isfile(p)]
+        files.sort(key=lambda p: os.path.getmtime(p), reverse=True)
+        for p in files[limit:]:
+            try:
+                os.remove(p)
+            except Exception:
+                pass
+    except Exception:
+        pass
 
 def extract_digits_from_name(p):
     name = os.path.basename(p)
@@ -47,7 +68,10 @@ if uploaded is not None:
             src_path = os.path.join('uploads', filename)
             with open(src_path, 'wb') as f:
                 f.write(uploaded.read())
-            n_text = read_n_text(extract_digits_from_name(uploaded.name))
+            cleanup_dir('uploads', 10)
+            cleanup_dir('tmp', 10)
+            skc_id = extract_digits_from_name(uploaded.name)
+            n_text = read_n_text(skc_id)
             try:
                 w, h = get_page_size(label)
                 overlay = build_overlay(
@@ -58,9 +82,9 @@ if uploaded is not None:
                     font_path=None,
                     font_bold_path=None,
                     batch_align='right',
-                    batch_offset_x=-35,
-                    batch_offset_y=-5,
-                    batch_font_size=8,
+                    batch_offset_x=BATCH_OFFSET_X,
+                    batch_offset_y=BATCH_OFFSET_Y,
+                    batch_font_size=int(BATCH_FONT_SIZE),
                     batch_font_weight='bold',
                     batch_length_align='left',
                     img_height_pt=0,
@@ -70,11 +94,13 @@ if uploaded is not None:
                     abs_y=0,
                     render_dpi=240,
                 )
-                out_name = f"updated_{uuid.uuid4().hex}.pdf"
+                ts = datetime.now().strftime('%Y%m%d%H%M%S')
+                out_name = f"标签_skc_{skc_id}_{ts}.pdf"
                 out_path = os.path.join('outputs', out_name)
                 merge_and_write(label, overlay, out_path)
+                cleanup_dir('outputs', 10)
                 with open(out_path, 'rb') as outf:
-                    st.download_button('下载已更新的标签 PDF', data=outf.read(), file_name='updated_label.pdf', mime='application/pdf')
+                    st.download_button('下载已更新的标签 PDF', data=outf.read(), file_name=out_name, mime='application/pdf')
                 st.success(f'生成完成，使用模板: {label}')
             except Exception as e:
                 st.error(f'处理失败: {e}')
